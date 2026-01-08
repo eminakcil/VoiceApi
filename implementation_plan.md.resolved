@@ -1,0 +1,61 @@
+# Implementation Plan - .NET API Quick Start
+
+This plan outlines the creation of a robust .NET API project focusing on speed and best practices.
+
+## Goal Description
+Create a .NET Web API with SQLite, Serilog, FluentValidation, Mapster, and specialized User Authentication (JWT + Refresh Token Rotation).
+
+## User Review Required
+> [!IMPORTANT]
+> **Updates**:
+> 1. **Scalar OpenAPI**: Replaces default Swagger UI.
+> 2. **Framework**: Targeting **.NET 10** as requested.
+> 3. **Authorization**: Will implement Role-based or Policy-based authorization.
+
+## Proposed Architecture
+**Single Project - Modular Folder Structure**
+To keep development fast but organized ("Vertical Slice" inspired folders or Feature folders):
+- `Features/`: Auth (Login, Register, Refresh)
+- `Domain/`: Entities
+- `Infrastructure/`: Database, Logging, External Services
+- `Shared/`: Result Pattern, Middlewares, Utilities
+
+## Proposed Changes
+
+### Project Initialization
+#### [NEW] .NET WebAPI Project
+- Framework: **.NET 10.0**
+- Path: `/Users/emin/Desktop/my-workspace/csharp-area/VoiceApi`
+
+### Nuget Packages
+- `Microsoft.EntityFrameworkCore.Sqlite`
+- `Microsoft.EntityFrameworkCore.Design`
+- `Serilog.AspNetCore`
+- `FluentValidation.DependencyInjectionExtensions`
+- `Mapster.DependencyInjection`
+- `BCrypt.Net-Next`
+- `Microsoft.AspNetCore.Authentication.JwtBearer`
+- `Scalar.AspNetCore` (for OpenAPI documentation)
+
+### Infrastructure
+#### [NEW] Global Exception Handler
+- Middleware to catch exceptions and return a standardized JSON error.
+
+#### [NEW] Response Wrapper
+- `ApiResponse<T>` class to wrap success/failure states.
+
+### Database
+#### [NEW] Entities
+- `User`: Id, Username, Email, PasswordHash, Salt, Roles (for Authorization).
+- `RefreshToken`: Id, Token, UserId, ExpiryDate, IsRevoked, IsUsed.
+
+### Authentication & Authorization
+- **JWT**: Claims for `Id`, `Email`, `Roles`.
+- **Authorization**: Policies for `Admin`, `User`.
+- **Flow**: Register -> Login -> Token Rotation.
+
+## Verification Plan
+### Automated Tests
+- Use `.http` files to test endpoints via VS Code / IDE.
+- Verify Scalar UI loads correctly.
+- Verify Serilog writes to console/file.

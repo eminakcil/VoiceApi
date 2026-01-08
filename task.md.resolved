@@ -1,0 +1,45 @@
+# Task List
+
+- [/] Planning
+    - [x] Create task.md
+    - [x] Create implementation_plan.md <!-- id: 0 -->
+    - [x] Review and approve plan <!-- id: 1 -->
+
+- [ ] Project Initialization
+    - [ ] Check .NET SDKs <!-- id: 22 -->
+    - [ ] Create new WebAPI project (.NET 10) <!-- id: 2 -->
+    - [ ] Install Nuget Packages <!-- id: 3 -->
+        - [ ] EF Core Sqlite
+        - [ ] Serilog
+        - [ ] FluentValidation
+        - [ ] Mapster
+        - [ ] JWT Bearer
+        - [ ] BCrypt/Argon2
+        - [ ] Scalar.AspNetCore
+
+- [ ] Infrastructure Setup
+    - [ ] Setup Serilog <!-- id: 4 -->
+    - [ ] Setup Global Exception Handling Middleware <!-- id: 5 -->
+    - [ ] Setup Generic Result Pattern (ApiResponse wrapper) <!-- id: 6 -->
+    - [ ] Setup Scalar OpenAPI <!-- id: 7 -->
+    - [ ] Setup CORS & Rate Limiting <!-- id: 8 -->
+
+- [ ] Database & Core
+    - [ ] Define User Entity (with Roles) <!-- id: 9 -->
+    - [ ] Define RefreshToken Entity <!-- id: 10 -->
+    - [ ] Setup AppDbContext (SQLite) <!-- id: 11 -->
+    - [ ] Run Initial Migrations <!-- id: 12 -->
+
+- [ ] Features
+    - [ ] Implement Auth Service (Login, Register, Refresh Token) <!-- id: 13 -->
+    - [ ] Implement Token Rotation Logic <!-- id: 14 -->
+    - [ ] Define Authorization Policies <!-- id: 23 -->
+    - [ ] Implement FluentValidation Validators <!-- id: 15 -->
+    - [ ] Implement Mapster Mappings <!-- id: 16 -->
+    - [ ] Create AuthController <!-- id: 17 -->
+
+- [ ] Verification
+    - [ ] Test Registration <!-- id: 18 -->
+    - [ ] Test Login & Token Generation <!-- id: 19 -->
+    - [ ] Test Token Refresh & Rotation <!-- id: 20 -->
+    - [ ] Verify Logging, Scalar & Exceptions <!-- id: 21 -->

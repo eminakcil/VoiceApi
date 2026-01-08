@@ -1,0 +1,46 @@
+@host = http://localhost:5200
+
+### Register User
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "Password123!"
+}
+
+### Login User
+# @name login
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Password123!"
+}
+
+### Get Token from Response
+@accessToken = {{login.response.body.data.accessToken}}
+@refreshToken = {{login.response.body.data.refreshToken}}
+
+### Check Auth (Protected)
+GET {{host}}/api/auth/check-auth
+Authorization: Bearer {{accessToken}}
+
+### Refresh Token
+POST {{host}}/api/auth/refresh-token
+Content-Type: application/json
+
+{
+  "token": "{{accessToken}}",
+  "refreshToken": "{{refreshToken}}"
+}
+
+### Revoke Token
+POST {{host}}/api/auth/revoke-token
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}

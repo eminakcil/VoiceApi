@@ -1,0 +1,40 @@
+using Scalar.AspNetCore;
+using Serilog;
+using VoiceApi.Features.Auth;
+using VoiceApi.Infrastructure.Extensions;
+using VoiceApi.Shared.Middlewares;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 1. Setup Serilog
+builder.Host.UseSerilog((context, config) => config.ReadFrom.Configuration(context.Configuration));
+
+// 2. Add Services
+builder
+    .Services.AddDataLayer(builder.Configuration)
+    .AddAuthLayer(builder.Configuration)
+    .AddCoreServices();
+
+var app = builder.Build();
+
+// 3. Configure Pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference(); // Scalar UI
+}
+
+app.UseGlobalExceptionHandler(); // Custom Exception Handler
+
+app.UseHttpsRedirection();
+
+app.UseCors("AllowAll");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapAuthEndpoints();
+
+Log.Information("--> Application is running on http://localhost:5200");
+
+app.Run();
