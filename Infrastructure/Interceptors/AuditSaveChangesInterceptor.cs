@@ -37,7 +37,7 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
                 if (entry.Entity.Id == Guid.Empty)
                 {
                     // Guid v7 generation is usually handled by property initializer or here if needed.
-                    // entry.Entity.Id = Guid.CreateVersion7(); // Already done in BaseEntity constructor
+                    entry.Entity.Id = Guid.CreateVersion7();
                 }
                 entry.Entity.CreatedAt = DateTime.UtcNow;
             }
