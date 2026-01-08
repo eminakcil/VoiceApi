@@ -93,7 +93,9 @@
     import audioService from './AudioService.js'; // Senin gönderdiğin AudioService
 
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl("/hubs/voice")
+      .withUrl("/hubs/voice", {
+        accessTokenFactory: "",
+      })
       .withAutomaticReconnect()
       .build();
 

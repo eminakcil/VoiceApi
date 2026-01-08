@@ -75,6 +75,24 @@ public static class ServiceCollectionExtensions
                     ValidAudience = jwtSettings.Audience,
                     ClockSkew = TimeSpan.Zero,
                 };
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+
+                        // Eğer istek bizim hub'a geliyorsa ve token varsa, bunu kullan
+                        if (
+                            !string.IsNullOrEmpty(accessToken)
+                            && path.StartsWithSegments("/hubs/voice")
+                        )
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    },
+                };
             });
 
         services.AddAuthorization(options =>

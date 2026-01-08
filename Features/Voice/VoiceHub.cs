@@ -5,6 +5,7 @@ using VoiceApi.Infrastructure.Options;
 
 namespace VoiceApi.Features.Voice;
 
+[Authorize]
 public class VoiceHub : Hub
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -27,11 +28,17 @@ public class VoiceHub : Hub
 
     public async Task StartSection(StartSectionRequest request)
     {
+        var userIdString = Context.UserIdentifier;
+        if (string.IsNullOrEmpty(userIdString))
+            throw new HubException("Yetkisiz erişim!");
+
+        var userId = Guid.Parse(userIdString);
+
         using var scope = _scopeFactory.CreateScope();
         var voiceService = scope.ServiceProvider.GetRequiredService<IVoiceService>();
 
         // DB'de section oluştur
-        var section = await voiceService.CreateSectionAsync(request);
+        var section = await voiceService.CreateSectionAsync(request, userId);
 
         // Manager oluştur ve başlat
         var manager = new AzureTranscriptionManager(

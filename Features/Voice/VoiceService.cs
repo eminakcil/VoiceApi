@@ -16,7 +16,7 @@ public class VoiceService : IVoiceService
         _logger = logger;
     }
 
-    public async Task<Section> CreateSectionAsync(StartSectionRequest request)
+    public async Task<Section> CreateSectionAsync(StartSectionRequest request, Guid userId)
     {
         Guid finalSessionId;
 
@@ -24,7 +24,7 @@ public class VoiceService : IVoiceService
         {
             var newSession = new Session
             {
-                UserId = Guid.Parse("019B9E82-BBCB-727D-8B0E-450567D13CB1"),
+                UserId = userId,
                 Title = $"Oturum - {DateTime.Now:dd.MM.yyyy HH:mm}",
                 CreatedAt = DateTime.UtcNow,
             };
