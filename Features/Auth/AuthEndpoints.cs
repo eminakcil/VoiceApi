@@ -17,9 +17,13 @@ public static class AuthEndpoints
                 async (RegisterRequest request, IAuthService authService) =>
                 {
                     var result = await authService.RegisterAsync(request);
-                    if (!result.Success)
-                        return Results.BadRequest(result);
-                    return Results.Ok(result);
+                    if (result.IsFailure)
+                        return Results.BadRequest(
+                            ApiResponse<AuthResponse>.Fail(result.Error.Message)
+                        );
+                    return Results.Ok(
+                        ApiResponse<AuthResponse>.Ok(result.Value, "User registered successfully.")
+                    );
                 }
             )
             .AddEndpointFilter<ValidationFilter<RegisterRequest>>();
@@ -30,9 +34,14 @@ public static class AuthEndpoints
                 async (LoginRequest request, IAuthService authService) =>
                 {
                     var result = await authService.LoginAsync(request);
-                    if (!result.Success)
-                        return Results.Json(result, statusCode: 401);
-                    return Results.Ok(result);
+                    if (result.IsFailure)
+                        return Results.Json(
+                            ApiResponse<AuthResponse>.Fail(result.Error.Message),
+                            statusCode: 401
+                        );
+                    return Results.Ok(
+                        ApiResponse<AuthResponse>.Ok(result.Value, "Login successful.")
+                    );
                 }
             )
             .AddEndpointFilter<ValidationFilter<LoginRequest>>();
@@ -42,9 +51,9 @@ public static class AuthEndpoints
             async (RefreshTokenRequest request, IAuthService authService) =>
             {
                 var result = await authService.RefreshTokenAsync(request);
-                if (!result.Success)
-                    return Results.BadRequest(result);
-                return Results.Ok(result);
+                if (result.IsFailure)
+                    return Results.BadRequest(ApiResponse<AuthResponse>.Fail(result.Error.Message));
+                return Results.Ok(ApiResponse<AuthResponse>.Ok(result.Value, "Token refreshed."));
             }
         );
 
@@ -53,9 +62,9 @@ public static class AuthEndpoints
             async (RevokeTokenRequest request, IAuthService authService) =>
             {
                 var result = await authService.RevokeTokenAsync(request.RefreshToken);
-                if (!result.Success)
-                    return Results.BadRequest(result);
-                return Results.Ok(result);
+                if (result.IsFailure)
+                    return Results.BadRequest(ApiResponse<bool>.Fail(result.Error.Message));
+                return Results.Ok(ApiResponse<bool>.Ok(result.Value, "Token revoked."));
             }
         );
 

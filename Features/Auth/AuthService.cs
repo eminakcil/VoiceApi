@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using VoiceApi.Domain;
 using VoiceApi.Infrastructure;
 using VoiceApi.Shared.Models;
+using VoiceApi.Shared.Primitives;
 
 namespace VoiceApi.Features.Auth;
 
@@ -25,14 +26,16 @@ public class AuthService : IAuthService
         _jwtSettings = jwtSettings.Value;
     }
 
-    public async Task<ApiResponse<AuthResponse>> RegisterAsync(RegisterRequest request)
+    public async Task<Result<AuthResponse>> RegisterAsync(RegisterRequest request)
     {
         // 1. Check if user exists
         if (await _context.Users.AnyAsync(u => u.Email == request.Email))
-            return ApiResponse<AuthResponse>.Fail("Email already registered.");
+            return Result.Failure<AuthResponse>(
+                new Error("Auth.EmailUsed", "Email already registered.")
+            );
 
         if (await _context.Users.AnyAsync(u => u.Username == request.Username))
-            return ApiResponse<AuthResponse>.Fail("Username taken.");
+            return Result.Failure<AuthResponse>(new Error("Auth.UsernameUsed", "Username taken."));
 
         // 2. Hash Password
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
@@ -53,30 +56,32 @@ public class AuthService : IAuthService
 
         var authResponse = new AuthResponse(accessToken, refreshToken.Token, refreshToken.Expires);
 
-        return ApiResponse<AuthResponse>.Ok(authResponse, "User registered successfully.");
+        return authResponse;
     }
 
-    public async Task<ApiResponse<AuthResponse>> LoginAsync(LoginRequest request)
+    public async Task<Result<AuthResponse>> LoginAsync(LoginRequest request)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
         {
             // Security best practice: generic message
-            return ApiResponse<AuthResponse>.Fail("Invalid credentials.");
+            return Result.Failure<AuthResponse>(
+                new Error("Auth.InvalidCredentials", "Invalid credentials.")
+            );
         }
 
         var authResponse = await CreateAndSaveAuthResponseAsync(user);
-        return ApiResponse<AuthResponse>.Ok(authResponse, "Login successful.");
+        return authResponse;
     }
 
-    public async Task<ApiResponse<AuthResponse>> RefreshTokenAsync(RefreshTokenRequest request)
+    public async Task<Result<AuthResponse>> RefreshTokenAsync(RefreshTokenRequest request)
     {
         var user = await _context
             .Users.Include(u => u.RefreshTokens)
             .FirstOrDefaultAsync(u => u.RefreshTokens.Any(t => t.Token == request.RefreshToken));
 
         if (user == null)
-            return ApiResponse<AuthResponse>.Fail("Invalid token.");
+            return Result.Failure<AuthResponse>(new Error("Auth.InvalidToken", "Invalid token."));
 
         var refreshToken = user.RefreshTokens.Single(x => x.Token == request.RefreshToken);
 
@@ -86,13 +91,16 @@ public class AuthService : IAuthService
             // Reuse Detection: If a revoked token is used, revoke all descendant tokens (security breach suspected).
             // For now, simpler approach: Revoke all tokens for this user to force re-login.
             await RevokeAllUserTokensAsync(user.Id);
-            return ApiResponse<AuthResponse>.Fail(
-                "Invalid token usage detected. Please login again."
+            return Result.Failure<AuthResponse>(
+                new Error(
+                    "Auth.InvalidTokenUsage",
+                    "Invalid token usage detected. Please login again."
+                )
             );
         }
 
         if (refreshToken.IsExpired)
-            return ApiResponse<AuthResponse>.Fail("Token expired.");
+            return Result.Failure<AuthResponse>(new Error("Auth.TokenExpired", "Token expired."));
 
         // Rotate Token
         var newAuthResponse = await CreateAndSaveAuthResponseAsync(user);
@@ -104,26 +112,26 @@ public class AuthService : IAuthService
         // _context.Update(refreshToken); // Redundant, change tracker handles it.
         await _context.SaveChangesAsync();
 
-        return ApiResponse<AuthResponse>.Ok(newAuthResponse, "Token refreshed.");
+        return newAuthResponse;
     }
 
-    public async Task<ApiResponse<bool>> RevokeTokenAsync(string token)
+    public async Task<Result<bool>> RevokeTokenAsync(string token)
     {
         var refreshToken = await _context.RefreshTokens.FirstOrDefaultAsync(rt =>
             rt.Token == token
         );
 
         if (refreshToken == null)
-            return ApiResponse<bool>.Fail("Token not found.");
+            return Result.Failure<bool>(new Error("Auth.TokenNotFound", "Token not found."));
 
         if (refreshToken.IsActive)
         {
             refreshToken.Revoked = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-            return ApiResponse<bool>.Ok(true, "Token revoked.");
+            return true;
         }
 
-        return ApiResponse<bool>.Ok(false, "Token already inactive.");
+        return false;
     }
 
     // --- Helpers ---
