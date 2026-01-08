@@ -22,7 +22,13 @@ public class GlobalExceptionHandler
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Unhandled Exception: {Message}", ex.Message);
+            Log.Error(
+                ex,
+                "Unhandled Exception. Path: {Path}, Method: {Method}, Message: {Message}",
+                context.Request.Path,
+                context.Request.Method,
+                ex.Message
+            );
             await HandleExceptionAsync(context, ex);
         }
     }
@@ -37,10 +43,10 @@ public class GlobalExceptionHandler
         );
 
         // In Development, you might want to show the actual exception message
-        // if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
-        // {
-        //     response.Message = exception.Message;
-        // }
+        if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
+        {
+            response.Message = exception.Message;
+        }
 
         var json = JsonSerializer.Serialize(response);
         return context.Response.WriteAsync(json);

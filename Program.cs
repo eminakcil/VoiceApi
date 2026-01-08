@@ -4,6 +4,12 @@ using VoiceApi.Features.Auth;
 using VoiceApi.Infrastructure.Extensions;
 using VoiceApi.Shared.Middlewares;
 
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .Enrich.FromLogContext()
+    .CreateLogger();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Setup Serilog
