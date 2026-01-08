@@ -3,175 +3,191 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>VoiceBridge Real-Time Test</title>
+  <title>VoiceBridge - Canlı Çeviri ve Ses</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 30px;
+      background: #f4f7f6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
       padding: 20px;
-      line-height: 1.6;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      align-items: center;
     }
 
     #results {
-      border: 2px solid #eee;
-      padding: 15px;
-      border-radius: 8px;
-      min-height: 150px;
-      background: #fdfdfd;
+      border-top: 2px solid #eee;
+      padding-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
     }
 
-    .status {
-      font-weight: bold;
-      margin-bottom: 10px;
+    .utterance {
+      margin-bottom: 15px;
+      padding: 10px;
+      border-left: 4px solid #007bff;
+      background: #f8f9fa;
     }
 
     .btn {
-      padding: 10px 20px;
-      cursor: pointer;
+      padding: 12px 24px;
+      border-radius: 6px;
       border: none;
-      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-start {
+      background: #28a745;
       color: white;
     }
 
-    #btnStart {
-      background-color: #28a745;
-    }
-
-    #btnStop {
-      background-color: #dc3545;
+    .btn-stop {
+      background: #dc3545;
+      color: white;
     }
 
     .btn:disabled {
-      background-color: #ccc;
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 0.9em;
+      color: #666;
     }
   </style>
 </head>
 
 <body>
 
-  <h2>VoiceBridge Canlı Çeviri Testi</h2>
-  <div id="status" class="status">Durum: Bağlanıyor...</div>
+  <div class="container">
+    <h2>VoiceBridge Canlı Çeviri</h2>
 
-  <button id="btnStart" class="btn">Mikrofonu Başlat</button>
-  <button id="btnStop" class="btn" disabled>Durdur</button>
+    <div class="controls">
+      <button id="btnStart" class="btn btn-start">🎙️ Konuşmaya Başla</button>
+      <button id="btnStop" class="btn btn-stop" disabled>🛑 Durdur</button>
+      <label>
+        <input type="checkbox" id="chkMute"> Sesi Kapat (Mute)
+      </label>
+    </div>
 
-  <h3>Çeviri Akışı:</h3>
-  <div id="results"></div>
+    <div id="status" class="status">Sistem hazır.</div>
+    <div id="results"></div>
+  </div>
 
   <script type="module">
-    // --- 1. AudioService Mantığı (Senin gönderdiğin mantıkla optimize edildi) ---
-    class AudioService {
-      constructor() {
-        this.audioContext = null;
-        this.scriptProcessor = null;
-        this.microphoneStream = null;
-      }
+    import audioService from './AudioService.js'; // Senin gönderdiğin AudioService
 
-      async start(onAudioCallback) {
-        this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-        this.microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-        const source = this.audioContext.createMediaStreamSource(this.microphoneStream);
-
-        // 4096 buffer size, 1 kanal giriş, 1 kanal çıkış
-        this.scriptProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
-
-        source.connect(this.scriptProcessor);
-        this.scriptProcessor.connect(this.audioContext.destination);
-
-        function arrayBufferToBase64(buffer) {
-          let binary = '';
-          const bytes = new Uint8Array(buffer);
-          const len = bytes.byteLength;
-          for (let i = 0; i < len; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-          return window.btoa(binary);
-        }
-
-        this.scriptProcessor.onaudioprocess = (e) => {
-          const inputData = e.inputBuffer.getChannelData(0);
-          const pcm16 = this.floatTo16BitPCM(inputData); // Senin Int16 çeviricin
-
-          // 1. PCM Buffer'ı Base64 String'e çevir
-          const base64String = arrayBufferToBase64(pcm16.buffer);
-
-          // 2. String olarak Hub'a bas
-          connection.invoke("SendAudio", base64String);
-        };
-      }
-
-      floatTo16BitPCM(input) {
-        let i = input.length;
-        let output = new Int16Array(i);
-        while (i--) {
-          let s = Math.max(-1, Math.min(1, input[i]));
-          output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        return output;
-      }
-
-      stop() {
-        if (this.microphoneStream) {
-          this.microphoneStream.getTracks().forEach(t => t.stop());
-        }
-        if (this.scriptProcessor) {
-          this.scriptProcessor.disconnect();
-        }
-      }
-    }
-
-    const audioSvc = new AudioService();
-
-    // --- 2. SignalR Bağlantısı ---
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl("/hubs/voice") // Backend endpoint'in
+      .withUrl("/hubs/voice")
       .withAutomaticReconnect()
       .build();
 
+    // --- 1. Ses Çalma Mantığı (Queue System) ---
+    // Gelen ses parçalarını sırayla çalmak için bir kuyruk yapısı
+    let audioQueue = [];
+    let isPlaying = false;
+
+    connection.on("ReceiveAudio", (base64Audio) => {
+      // Backend'den gelen Base64 sesi kuyruğa ekle
+      audioQueue.push(base64Audio);
+      if (!isPlaying) {
+        playNextInQueue();
+      }
+    });
+
+    async function playNextInQueue() {
+      if (audioQueue.length === 0) {
+        isPlaying = false;
+        return;
+      }
+
+      isPlaying = true;
+      const base64 = audioQueue.shift();
+
+      // Senin AudioService içindeki playAudioBlob mantığını kullanıyoruz
+      // Ancak takılma olmaması için her parçayı yeni bir Audio nesnesiyle çalıyoruz
+      const bytes = base64ToUint8Array(base64);
+      const blob = new Blob([bytes], { type: "audio/wav" });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        playNextInQueue(); // Parça bittiğinde sonrakine geç
+      };
+
+      await audio.play().catch(err => console.error("Oynatma hatası:", err));
+    }
+
+    function base64ToUint8Array(base64) {
+      const binaryString = window.atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    // --- 2. Metin Çevirilerini Ekrana Basma ---
     connection.on("ReceiveUtterance", (data) => {
+      const resultsDiv = document.getElementById("results");
       const div = document.createElement("div");
-      div.innerHTML = `<p><strong>Orijinal:</strong> ${data.originalText} <br> 
-                             <strong>Çeviri:</strong> <span style="color:blue">${data.translatedText}</span></p><hr>`;
-      document.getElementById("results").prepend(div);
+      div.className = "utterance";
+      div.innerHTML = `<strong>Siz:</strong> ${data.originalText}<br>
+                         <strong style="color:#007bff">Çeviri:</strong> ${data.translatedText}`;
+      resultsDiv.prepend(div);
     });
 
-    connection.start().then(() => {
-      document.getElementById("status").innerText = "Durum: Bağlantı Hazır ✅";
-    }).catch(err => {
-      document.getElementById("status").innerText = "Hata: " + err.message;
-    });
-
-    // --- 3. Buton Kontrolleri ---
+    // --- 3. Başlat/Durdur ---
     document.getElementById("btnStart").onclick = async () => {
+      const isMuted = document.getElementById("chkMute").checked;
+
       try {
-        // Section'ı başlatıyoruz (SessionId null -> otomatik oluşturur)
+        await connection.start();
+
+        // Backend'e "Oturumu Başlat" diyoruz
         await connection.invoke("StartSection", {
-          SessionId: null,
+          SessionId: null, // Yeni session
           SourceLanguage: "tr-TR",
-          TargetLanguage: "en-US"
+          TargetLanguage: "en-US",
+          IsMuted: isMuted
         });
 
-        // Mikrofonu aç ve gelen her paketi gönder
-        await audioSvc.start((byteArray) => {
-          connection.invoke("SendAudio", byteArray);
+        // Mikrofonu aç ve ham byte array'i gönder (Base64'e çevirerek)
+        await audioService.startRecording((base64Data) => {
+          connection.invoke("SendAudio", base64Data);
         });
 
         document.getElementById("btnStart").disabled = true;
         document.getElementById("btnStop").disabled = false;
-        document.getElementById("status").innerText = "Durum: Kayıt Yapılıyor... 🎙️";
+        document.getElementById("status").innerText = "🎙️ Kayıt ve çeviri aktif...";
       } catch (err) {
         console.error(err);
-        alert("Başlatılamadı: " + err.message);
+        document.getElementById("status").innerText = "Hata: " + err.message;
       }
     };
 
-    document.getElementById("btnStop").onclick = () => {
-      audioSvc.stop();
-      connection.stop();
+    document.getElementById("btnStop").onclick = async () => {
+      audioService.stopRecording();
+      await connection.stop();
       document.getElementById("btnStart").disabled = false;
       document.getElementById("btnStop").disabled = true;
-      document.getElementById("status").innerText = "Durum: Durduruldu. Sayfayı yenileyin.";
+      document.getElementById("status").innerText = "Sistem durduruldu.";
     };
   </script>
 </body>

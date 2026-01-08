@@ -18,6 +18,10 @@ public class Section : BaseEntity
     [MaxLength(10)]
     public string TargetLanguage { get; set; } = string.Empty;
 
+    public string? OriginalAudioPath { get; set; }
+    public string? TranslatedAudioPath { get; set; }
+    public bool IsMuted { get; set; } = false;
+
     public DateTime StartedAt { get; set; } = DateTime.UtcNow;
     public DateTime? EndedAt { get; set; }
 

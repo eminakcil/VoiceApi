@@ -17,6 +17,10 @@ public class AzureTranscriptionManager : IDisposable
     private readonly FileStream _rawStream;
     private readonly string _rawPath;
 
+    private readonly string _translatedPath;
+    private readonly FileStream _translatedStream;
+    private readonly bool _isMuted;
+
     private readonly IServiceScopeFactory _scopeFactory;
 
     public AzureTranscriptionManager(
@@ -26,16 +30,33 @@ public class AzureTranscriptionManager : IDisposable
         string targetLang,
         string key,
         string region,
-        IServiceProvider serviceProvider,
+        bool IsMuted,
         IHubContext<VoiceHub> hubContext,
         IServiceScopeFactory scopeFactory
     )
     {
         _sectionId = sectionId;
         _connectionId = connectionId;
-        _serviceProvider = serviceProvider;
         _hubContext = hubContext;
         _scopeFactory = scopeFactory;
+        _isMuted = IsMuted;
+
+        _translatedPath = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "wwwroot",
+            "recordings",
+            $"{_sectionId}_translated.raw"
+        );
+
+        if (!_isMuted)
+        {
+            _translatedStream = new FileStream(
+                _translatedPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.ReadWrite
+            );
+        }
 
         // 1. Dosya Sistemi Hazırlığı
         var folderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "recordings");
@@ -53,6 +74,8 @@ public class AzureTranscriptionManager : IDisposable
         config.SpeechRecognitionLanguage = sourceLang;
         config.AddTargetLanguage(targetLang);
 
+        config.VoiceName = AzureVoiceConstants.GetVoiceName(targetLang);
+
         _audioInputStream = AudioInputStream.CreatePushStream();
         _recognizer = new TranslationRecognizer(
             config,
@@ -61,6 +84,16 @@ public class AzureTranscriptionManager : IDisposable
 
         // 3. Events
         _recognizer.Recognized += async (s, e) => await HandleRecognized(e, targetLang);
+
+        _recognizer.Synthesizing += (s, e) =>
+        {
+            var audioData = e.Result.GetAudio();
+            if (audioData != null && audioData.Length > 0)
+            {
+                // Sesi hem dosyaya yaz hem de Hub üzerinden gönder
+                HandleSynthesizing(audioData);
+            }
+        };
     }
 
     private async Task HandleRecognized(TranslationRecognitionEventArgs e, string targetLang)
@@ -91,6 +124,17 @@ public class AzureTranscriptionManager : IDisposable
         }
     }
 
+    private void HandleSynthesizing(byte[] audioData)
+    {
+        if (_isMuted)
+            return;
+
+        _translatedStream.Write(audioData, 0, audioData.Length);
+
+        var base64Audio = Convert.ToBase64String(audioData);
+        _hubContext.Clients.Client(_connectionId).SendAsync("ReceiveAudio", base64Audio);
+    }
+
     public void ProvideAudio(byte[] data)
     {
         _audioInputStream.Write(data);
@@ -104,6 +148,12 @@ public class AzureTranscriptionManager : IDisposable
         await _recognizer.StopContinuousRecognitionAsync();
         await _rawStream.DisposeAsync();
         CreateWavFile(_rawPath); // Kapatırken WAV'a çevir
+
+        if (!_isMuted && _translatedStream != null)
+        {
+            await _translatedStream.DisposeAsync();
+            CreateWavFile(_translatedPath);
+        }
     }
 
     private void CreateWavFile(string rawPath)
@@ -136,4 +186,10 @@ public class AzureTranscriptionManager : IDisposable
         _recognizer.Dispose();
         _audioInputStream.Dispose();
     }
+
+    public string GetOriginalPath() => _rawPath.Replace(".raw", ".wav");
+
+    public string GetTranslatedPath() => _translatedPath;
+
+    public Guid GetSectionId() => _sectionId;
 }

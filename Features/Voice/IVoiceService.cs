@@ -7,5 +7,9 @@ public interface IVoiceService
 {
     Task<Section> CreateSectionAsync(StartSectionRequest request);
     Task SaveUtteranceAsync(Guid sectionId, string original, string translated);
-    Task<Result<bool>> EndSectionAsync(Guid sectionId);
+    Task<Result<bool>> EndSectionAsync(
+        Guid sectionId,
+        string? originalPath,
+        string? translatedPath
+    );
 }

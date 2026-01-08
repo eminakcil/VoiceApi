@@ -45,6 +45,9 @@ public class VoiceService : IVoiceService
             SourceLanguage = request.SourceLanguage,
             TargetLanguage = request.TargetLanguage,
             StartedAt = DateTime.UtcNow,
+            IsMuted = request.IsMuted,
+            OriginalAudioPath = null,
+            TranslatedAudioPath = null,
         };
 
         _context.Sections.Add(section);
@@ -65,13 +68,20 @@ public class VoiceService : IVoiceService
         await _context.SaveChangesAsync();
     }
 
-    public async Task<Result<bool>> EndSectionAsync(Guid sectionId)
+    public async Task<Result<bool>> EndSectionAsync(
+        Guid sectionId,
+        string? originalPath,
+        string? translatedPath
+    )
     {
         var section = await _context.Sections.FindAsync(sectionId);
         if (section == null)
             return Result.Failure<bool>(new Error("Voice.NotFound", "Section not found"));
 
         section.EndedAt = DateTime.UtcNow;
+        section.OriginalAudioPath = originalPath;
+        section.TranslatedAudioPath = translatedPath;
+
         await _context.SaveChangesAsync();
         return true;
     }
