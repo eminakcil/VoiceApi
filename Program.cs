@@ -1,7 +1,9 @@
 using Scalar.AspNetCore;
 using Serilog;
 using VoiceApi.Features.Auth;
+using VoiceApi.Features.Voice;
 using VoiceApi.Infrastructure.Extensions;
+using VoiceApi.Infrastructure.Options;
 using VoiceApi.Shared.Middlewares;
 
 Log.Logger = new LoggerConfiguration()
@@ -14,6 +16,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Setup Serilog
 builder.Host.UseSerilog((context, config) => config.ReadFrom.Configuration(context.Configuration));
+
+builder.Services.AddSignalR();
+builder.Services.Configure<AzureSettings>(
+    builder.Configuration.GetSection(AzureSettings.SectionName)
+);
 
 // 2. Add Services
 builder
@@ -40,6 +47,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapAuthEndpoints();
+
+app.UseStaticFiles();
+app.MapHub<VoiceHub>("/hubs/voice");
 
 Log.Information("--> Application is running on http://localhost:5200");
 

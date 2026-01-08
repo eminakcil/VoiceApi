@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using VoiceApi.Features.Auth;
+using VoiceApi.Features.Voice;
 using VoiceApi.Infrastructure.Interceptors;
 using VoiceApi.Infrastructure.Options;
 using VoiceApi.Shared.Middlewares;
@@ -95,6 +96,7 @@ public static class ServiceCollectionExtensions
 
         // Services
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IVoiceService, VoiceService>();
 
         // Validators
         services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();

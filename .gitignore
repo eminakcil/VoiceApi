@@ -2,3 +2,9 @@ bin/
 obj/
 Logs
 *.db
+
+.DS_Store
+
+/wwwroot/recordings
+
+appsettings.json
